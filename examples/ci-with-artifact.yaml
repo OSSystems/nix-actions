@@ -1,0 +1,21 @@
+# The action runs as a step, so you can add your own steps afterwards on the
+# same runner (sharing the Nix store and workspace) - e.g. upload an artifact.
+name: CI
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: self-hosted
+    steps:
+      - uses: ossystems/nix-actions@v1
+        with:
+          flake-check: false   # build only
+          build-attrs: ".#nixosConfigurations.my-host.config.system.build.sdImage"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sd-image
+          path: ./result/sd-image/*.img*

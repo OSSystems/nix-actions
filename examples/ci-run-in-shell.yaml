@@ -1,0 +1,17 @@
+# Run a command inside the flake's dev shell (linters, tests) with the exact
+# tooling the shell pins, with no separate step to enter the environment.
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: self-hosted
+    steps:
+      - uses: ossystems/nix-actions@v1
+        with:
+          flake-check: false   # run only the command
+          devshell: .#ci       # omit to use the default dev shell
+          run: pytest -q

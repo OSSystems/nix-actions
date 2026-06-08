@@ -1,0 +1,17 @@
+name: CI
+on:
+  push:
+    branches: [master]   # switch to `main` depending on the repo
+    tags: ["*"]
+  pull_request:
+    types: [opened, ready_for_review, synchronize]
+
+jobs:
+  ci:
+    runs-on: self-hosted
+    steps:
+      - uses: ossystems/nix-actions@v1
+        with:
+          token-owner: my-org   # org for the GitHub App token (private flake inputs)
+          app-id: ${{ secrets.RUNNER_APP_ID }}
+          app-private-key: ${{ secrets.RUNNER_APP_PRIVATE_KEY }}

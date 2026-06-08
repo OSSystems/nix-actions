@@ -1,0 +1,22 @@
+# Weekly flake.lock bump with an automatic PR.
+name: update-flakes
+on:
+  schedule:
+    - cron: "0 0 * * 0"   # Sunday 00:00
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: self-hosted
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: ossystems/nix-actions/update-flake@v1
+        with:
+          base-branch: master         # or main
+          token-owner: my-org         # org for the GitHub App token
+          app-id: ${{ secrets.UPDATE_FLAKE_APP_ID }}
+          app-private-key: ${{ secrets.UPDATE_FLAKE_APP_PRIVATE_KEY }}
+          auto-merge: true            # optional
+          merge-method: rebase        # rebase | merge | squash

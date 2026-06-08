@@ -1,0 +1,82 @@
+name: "Update flake.lock"
+description: >-
+  Bump flake.lock and open a PR (optionally auto-merged). Runs as a step inside
+  your job; the job needs `permissions: contents: write` and `pull-requests: write`.
+
+inputs:
+  base-branch:
+    description: "Branch to update against (main/master)."
+    required: false
+    default: "main"
+  token-owner:
+    description: "Org for the GitHub App token. Empty falls back to the default GITHUB_TOKEN."
+    required: false
+    default: ""
+  app-id:
+    description: "GitHub App ID. Required when token-owner is set."
+    required: false
+    default: ""
+  app-private-key:
+    description: "GitHub App private key. Required when token-owner is set."
+    required: false
+    default: ""
+  install-nix:
+    description: '"true" to install Nix (hosted runners). "false" for self-hosted with Nix.'
+    required: false
+    default: "false"
+  reviewers:
+    description: "Comma-separated PR reviewers."
+    required: false
+    default: ""
+  pr-labels:
+    description: "Newline-separated PR labels."
+    required: false
+    default: |
+      dependencies
+      automated
+  auto-merge:
+    description: '"true" to enable PR auto-merge after creation.'
+    required: false
+    default: "true"
+  merge-method:
+    description: "Auto-merge method: rebase | merge | squash."
+    required: false
+    default: "rebase"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Generate GitHub App token
+      id: app-token
+      if: inputs.token-owner != ''
+      uses: actions/create-github-app-token@v3
+      with:
+        app-id: ${{ inputs.app-id }}
+        private-key: ${{ inputs.app-private-key }}
+        owner: ${{ inputs.token-owner }}
+
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        ref: ${{ inputs.base-branch }}
+        fetch-depth: 0
+
+    - name: Install Nix
+      if: inputs.install-nix == 'true'
+      uses: nixbuild/nix-quick-install-action@v34
+
+    - name: Update flake.lock
+      id: update
+      uses: DeterminateSystems/update-flake-lock@v28
+      with:
+        token: ${{ steps.app-token.outputs.token || github.token }}
+        pr-title: "Update flake.lock"
+        pr-labels: ${{ inputs.pr-labels }}
+        pr-reviewers: ${{ inputs.reviewers }}
+
+    - name: Auto merge
+      if: inputs.auto-merge == 'true' && steps.update.outputs.pull-request-number != ''
+      shell: bash
+      run: gh pr merge --auto --${{ inputs.merge-method }} ${{ steps.update.outputs.pull-request-number }}
+      env:
+        GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}

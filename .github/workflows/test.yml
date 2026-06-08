@@ -1,0 +1,81 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  explicit:
+    name: explicit build-attrs + inline flags + run-in-devshell
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./
+        with:
+          checkout: false
+          install-nix: true
+          build-hosts: false
+          build-devshells: false
+          build-attrs: ".#packages.x86_64-linux.pkgA .#packages.x86_64-linux.pkgB -o result-pkg"
+          devshell: ".#ci"
+          run: jq --version
+      - name: Assert the inline -o flag produced its link
+        run: test -e result-pkg
+
+  generated:
+    name: build-hosts + build-devshells + checks + empty-platform safety
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./
+        with:
+          checkout: false
+          install-nix: true
+          emulate-systems: i686-linux
+          checks: true
+
+  matrix:
+    name: matrix + checks
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write
+    steps:
+      - uses: actions/checkout@v6
+      - uses: ./
+        with:
+          checkout: false
+          install-nix: true
+          flake-check: false
+          build-hosts: false
+          build-devshells: false
+          build-attrs: matrix
+          checks: true
+
+  export-devshell:
+    name: export-devshell env-export into later steps
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Assert the shell is not loaded yet
+        run: |
+          if command -v hello >/dev/null; then echo "hello leaked before export" && exit 1; fi
+          if [ -n "${NIX_ACTION_DEVELOP_SENTINEL:-}" ]; then echo "env leaked before export" && exit 1; fi
+      - uses: ./
+        with:
+          checkout: false
+          install-nix: true
+          export-devshell: true
+          devshell: ".#ci"
+      - name: Assert PATH from the dev shell reached this later step
+        run: hello --version
+      - name: Assert env vars from the dev shell reached this later step
+        run: test "$NIX_ACTION_DEVELOP_SENTINEL" = loaded

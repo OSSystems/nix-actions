@@ -1,0 +1,361 @@
+name: "Nix CI"
+description: >-
+  Run `nix flake check` and optionally `nix build` explicit attributes for a Nix
+  flake. Runs as a step inside your job, so you choose the runner and can add
+  your own steps (artifact upload, deploy) before/after on the same runner.
+
+inputs:
+  token-owner:
+    description: >-
+      Org to scope a GitHub App token to (for private flake inputs). Empty
+      disables the token (public flakes).
+    required: false
+    default: ""
+  app-id:
+    description: "GitHub App ID. Required when token-owner is set."
+    required: false
+    default: ""
+  app-private-key:
+    description: "GitHub App private key. Required when token-owner is set."
+    required: false
+    default: ""
+  install-nix:
+    description: >-
+      "true" to install Nix + restore the store cache (hosted runners without
+      Nix). "false" for self-hosted runners that already have Nix.
+    required: false
+    default: "false"
+  checkout:
+    description: '"true" to checkout the repo first. Set "false" if the job already did.'
+    required: false
+    default: "true"
+  fetch-depth:
+    description: "Checkout fetch-depth (when checkout is true)."
+    required: false
+    default: "1"
+  ref:
+    description: "Git ref to checkout (when checkout is true). Empty uses the ref that triggered the run."
+    required: false
+    default: ""
+  flake-check:
+    description: '"true" to run `nix flake check`.'
+    required: false
+    default: "true"
+  flake-check-args:
+    description: "Extra args for `nix flake check`."
+    required: false
+    default: ""
+  trust-flake:
+    description: >-
+      "true" to honor the flake's own nixConfig (extra-substituters,
+      extra-trusted-public-keys, etc.) on every nix command by setting
+      `accept-flake-config = true` in NIX_CONFIG. Needed for the flake's binary
+      caches to be used. "false" to ignore the flake's config.
+    required: false
+    default: "true"
+  build-attrs:
+    description: >-
+      Installables to `nix build` (e.g. '.#foo .#bar'). The special value
+      "matrix" builds every attr from `.#githubActions.<matrix-name>` in this
+      one job. Empty skips the build.
+    required: false
+    default: ""
+  build-args:
+    description: "Args passed to `nix build` before the attrs."
+    required: false
+    default: "-L --keep-going"
+  matrix-name:
+    description: >-
+      When build-attrs is "matrix", the `.#githubActions.<name>` attribute to
+      read the build list from (the flake's nix-github-actions output).
+    required: false
+    default: "matrix"
+  build-hosts:
+    description: >-
+      "true" (default) to build the `config.system.build.toplevel` of every
+      `.#nixosConfigurations` entry in this one job, with no githubActions matrix
+      to maintain. Each build is labelled by the host name (use with checks).
+      Combines with build-attrs. "false" to skip (e.g. a flake with no hosts to
+      build). When the flake exposes no `nixosConfigurations`, nothing is built.
+    required: false
+    default: "true"
+  build-devshells:
+    description: >-
+      "true" (default) to build every `.#devShells.<system>.<name>` in this one
+      job, warming the dev environment cache with no githubActions matrix to
+      maintain. Only the systems this runner can build (its `system` plus
+      `extra-platforms`, which emulate-systems feeds) are attempted. Each build is
+      labelled `devshell-<name>-<system>` (use with checks). Combines with
+      build-attrs and build-hosts. "false" to skip. When the flake exposes no
+      `devShells`, nothing is built.
+    required: false
+    default: "true"
+  emulate-systems:
+    description: >-
+      Space-separated extra Nix platforms to build under QEMU emulation (e.g.
+      "aarch64-linux"). Registers binfmt via the tonistiigi/binfmt container and
+      adds the systems to `extra-platforms`, so one runner can build cross-arch
+      Linux derivations with no remote builder. Linux arches only (not Darwin);
+      emulated builds are slow. Needs privileged docker (hosted runners have it).
+      Empty disables emulation.
+    required: false
+    default: ""
+  checks:
+    description: >-
+      "true" to report each built attribute as its own GitHub check run (one
+      status entry per build in the PR Checks tab / merge box), instead of a
+      single combined build. Requires the token to have checks:write. Serializes
+      the builds (loses Nix's cross-attr parallelism). "false" keeps the single
+      combined nix build.
+    required: false
+    default: "false"
+  run:
+    description: >-
+      Command to run inside a dev shell (`nix develop --command`). Empty skips
+      it. The shell is `devshell`, defaulting to the flake's default dev shell.
+    required: false
+    default: ""
+  devshell:
+    description: >-
+      Installable for the dev shell (e.g. '.#ci'). Empty uses the flake's default
+      dev shell. Used by `run` and by `export-devshell`.
+    required: false
+    default: ""
+  export-devshell:
+    description: >-
+      "true" to load the dev shell (`devshell`) into the job environment, so every
+      later step in your job runs inside it (env-export via nicknovitski/nix-develop).
+      In this mode the action does setup only (token, NIX_CONFIG, SSH, checkout,
+      Nix) and SKIPS its own flake-check, build and run, so you add your own steps
+      (west update, test, publish) after it. "false" disables env-export.
+    required: false
+    default: "false"
+  ssh-private-key:
+    description: >-
+      SSH private key to install at ~/.ssh/id_rsa, for tools that clone private
+      repos over SSH (e.g. `west update`). Empty installs no key.
+    required: false
+    default: ""
+  ssh-known-hosts:
+    description: >-
+      Space-separated hosts to add to ~/.ssh/known_hosts via ssh-keyscan when
+      ssh-private-key is set.
+    required: false
+    default: "github.com"
+
+outputs:
+  token:
+    description: "The minted GitHub App token, or empty when token-owner is unset."
+    value: ${{ steps.app-token.outputs.token }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Generate GitHub App token
+      id: app-token
+      if: inputs.token-owner != ''
+      uses: actions/create-github-app-token@v3
+      with:
+        app-id: ${{ inputs.app-id }}
+        private-key: ${{ inputs.app-private-key }}
+        owner: ${{ inputs.token-owner }}
+
+    - name: Configure NIX_CONFIG
+      if: inputs.token-owner != '' || inputs.trust-flake == 'true'
+      shell: bash
+      run: |
+        {
+          echo "NIX_CONFIG<<__NIX_EOF__"
+          if [ "${{ inputs.trust-flake }}" = "true" ]; then
+            echo "accept-flake-config = true"
+          fi
+          if [ -n "${{ steps.app-token.outputs.token }}" ]; then
+            echo "access-tokens = github.com=${{ steps.app-token.outputs.token }}"
+          fi
+          echo "__NIX_EOF__"
+        } >> "$GITHUB_ENV"
+
+    - name: Install SSH private key
+      if: inputs.ssh-private-key != ''
+      shell: bash
+      env:
+        NIX_ACTION_SSH_KEY: ${{ inputs.ssh-private-key }}
+        NIX_ACTION_SSH_HOSTS: ${{ inputs.ssh-known-hosts }}
+      run: |
+        mkdir -p -m 0700 ~/.ssh
+        printf '%s\n' "$NIX_ACTION_SSH_KEY" > ~/.ssh/id_rsa
+        chmod 600 ~/.ssh/id_rsa
+        for h in $NIX_ACTION_SSH_HOSTS; do
+          ssh-keyscan -H "$h" >> ~/.ssh/known_hosts 2>/dev/null
+        done
+        chmod 600 ~/.ssh/known_hosts
+
+    - name: Checkout
+      if: inputs.checkout == 'true'
+      uses: actions/checkout@v6
+      with:
+        ref: ${{ inputs.ref }}
+        fetch-depth: ${{ inputs.fetch-depth }}
+
+    - name: Install Nix
+      if: inputs.install-nix == 'true'
+      uses: nixbuild/nix-quick-install-action@v34
+
+    - name: Restore and cache Nix store
+      if: inputs.install-nix == 'true'
+      uses: nix-community/cache-nix-action@v7
+      with:
+        primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.*') }}
+        restore-prefixes-first-match: nix-${{ runner.os }}-
+
+    - name: Load dev shell into job environment
+      if: inputs.export-devshell == 'true'
+      uses: nicknovitski/nix-develop@v1
+      with:
+        arguments: ${{ inputs.devshell }}
+
+    - name: Register QEMU for emulated systems
+      if: inputs.emulate-systems != ''
+      shell: bash
+      run: docker run --privileged --rm tonistiigi/binfmt --install all
+
+    - name: Allow emulated platforms in Nix
+      if: inputs.emulate-systems != ''
+      shell: bash
+      run: |
+        mkdir -p ~/.config/nix
+        echo "extra-platforms = ${{ inputs.emulate-systems }}" >> ~/.config/nix/nix.conf
+
+    - name: nix flake check
+      if: inputs.flake-check == 'true' && inputs.export-devshell != 'true'
+      shell: bash
+      run: nix flake check ${{ inputs.flake-check-args }}
+
+    - name: nix build
+      if: (inputs.build-attrs != '' || inputs.build-hosts == 'true' || inputs.build-devshells == 'true') && inputs.export-devshell != 'true'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+      run: |
+        set -uo pipefail
+
+        pairs=""
+        inline_args=""
+        nl=$'\n'
+        add() { [ -n "$1" ] || return 0; pairs="${pairs:+$pairs$nl}$1"; }
+        arg() { inline_args="${inline_args:+$inline_args }$1"; }
+
+        if [ "${{ inputs.build-hosts }}" = "true" ]; then
+          hosts="$(nix eval --raw '.#nixosConfigurations' \
+            --apply 'cfgs: builtins.concatStringsSep "\n" (builtins.attrNames cfgs)' || true)"
+          while IFS= read -r h; do
+            [ -n "$h" ] || continue
+            add "$h"$'\t'".#nixosConfigurations.\"$h\".config.system.build.toplevel"
+          done <<< "$hosts"
+        fi
+
+        if [ "${{ inputs.build-devshells }}" = "true" ]; then
+          for s in $(nix config show system) $(nix config show extra-platforms); do
+            names="$(nix eval --raw ".#devShells.\"$s\"" \
+              --apply 'ds: builtins.concatStringsSep "\n" (builtins.attrNames ds)' 2>/dev/null || true)"
+            while IFS= read -r n; do
+              [ -n "$n" ] || continue
+              add "devshell-$n-$s"$'\t'".#devShells.\"$s\".\"$n\""
+            done <<< "$names"
+          done
+        fi
+
+        if [ "${{ inputs.build-attrs }}" = "matrix" ]; then
+          add "$(nix eval --raw ".#githubActions.${{ inputs.matrix-name }}" \
+            --apply 'm: builtins.concatStringsSep "\n"
+                       (map (e: (e.name or e.attr) + "\t" + ".#" + (e.attr or e.name)) m.include)')"
+        elif [ -n "${{ inputs.build-attrs }}" ]; then
+          expect_value=0
+          for tok in ${{ inputs.build-attrs }}; do
+            if [ "$expect_value" = 1 ]; then
+              arg "$tok"; expect_value=0
+            elif [ "${tok#-}" != "$tok" ]; then
+              arg "$tok"
+              case "$tok" in
+                -o|--out-link|-j|--max-jobs|--cores|--builders|--substituters) expect_value=1 ;;
+              esac
+            else
+              add "$tok"$'\t'"$tok"
+            fi
+          done
+        fi
+
+        if [ -z "$pairs" ]; then
+          echo "No installables resolved (no build-attrs, nixosConfigurations, or devShells); skipping build."
+          exit 0
+        fi
+
+        if [ "${{ inputs.checks }}" != "true" ]; then
+          attrs="$(printf '%s\n' "$pairs" | cut -f2 | tr '\n' ' ')"
+          echo "Building: ${attrs}"
+          exec nix build ${{ inputs.build-args }} ${inline_args} ${attrs}
+        fi
+
+        # Opt-in: one check run per build, individual status in the PR Checks tab.
+        # The default shell runs with `-e`; turn it off so one failed build or
+        # API call does not abort the loop, and drive the exit code ourselves.
+        set +e
+        sha="${{ github.event.pull_request.head.sha || github.sha }}"
+        declare -A pending
+        finish() {
+          node -e '
+            const fs = require("fs");
+            const [, conclusion, name, logf] = process.argv;
+            let log = fs.existsSync(logf) ? fs.readFileSync(logf, "utf8") : "";
+            if (log.length > 60000) log = log.slice(-60000);
+            process.stdout.write(JSON.stringify({
+              status: "completed",
+              conclusion,
+              output: {
+                title: name,
+                summary: "nix build `" + name + "` -> " + conclusion,
+                text: "```\n" + log + "\n```",
+              },
+            }));
+          ' "$2" "$3" "$4" \
+            | gh api "repos/${GITHUB_REPOSITORY}/check-runs/$1" -X PATCH --input - >/dev/null
+          unset "pending[$1]"
+        }
+        cleanup() {  # any check still open (e.g. step killed) -> cancelled, never stuck
+          for id in "${!pending[@]}"; do
+            gh api "repos/${GITHUB_REPOSITORY}/check-runs/${id}" -X PATCH \
+              -f status=completed -f conclusion=cancelled >/dev/null 2>&1 || true
+          done
+        }
+        trap cleanup EXIT
+
+        rc=0
+        while IFS=$'\t' read -r name attr; do
+          [ -n "$attr" ] || continue
+          id="$(gh api "repos/${GITHUB_REPOSITORY}/check-runs" -X POST \
+                  -f name="$name" -f head_sha="$sha" -f status=in_progress --jq '.id' 2>&1)"
+          if ! [[ "$id" =~ ^[0-9]+$ ]]; then
+            echo "::error::checks: true needs the token to have checks:write. API said: ${id}"
+            exit 1
+          fi
+          pending[$id]=1
+          logf="$(mktemp)"
+          echo "::group::build ${name}"
+          if nix build ${{ inputs.build-args }} ${inline_args} "$attr" 2>&1 | tee "$logf"; then
+            finish "$id" success "$name" "$logf"
+          else
+            finish "$id" failure "$name" "$logf"
+            rc=1
+          fi
+          echo "::endgroup::"
+          rm -f "$logf"
+        done <<< "$pairs"
+
+        exit $rc   # job still goes red if any build failed (job-level gating stays valid)
+
+    - name: Run in dev shell
+      if: inputs.run != '' && inputs.export-devshell != 'true'
+      shell: bash
+      env:
+        NIX_ACTION_RUN: ${{ inputs.run }}
+      run: nix develop ${{ inputs.devshell }} --command bash -c "$NIX_ACTION_RUN"
