@@ -188,14 +188,17 @@ runs:
     - name: Configure NIX_CONFIG
       if: inputs.token-owner != '' || inputs.trust-flake == 'true'
       shell: bash
+      env:
+        TRUST_FLAKE: ${{ inputs.trust-flake }}
+        APP_TOKEN: ${{ steps.app-token.outputs.token }}
       run: |
         {
           echo "NIX_CONFIG<<__NIX_EOF__"
-          if [ "${{ inputs.trust-flake }}" = "true" ]; then
+          if [ "$TRUST_FLAKE" = "true" ]; then
             echo "accept-flake-config = true"
           fi
-          if [ -n "${{ steps.app-token.outputs.token }}" ]; then
-            echo "access-tokens = github.com=${{ steps.app-token.outputs.token }}"
+          if [ -n "$APP_TOKEN" ]; then
+            echo "access-tokens = github.com=$APP_TOKEN"
           fi
           echo "__NIX_EOF__"
         } >> "$GITHUB_ENV"
@@ -242,25 +245,36 @@ runs:
     - name: Register QEMU for emulated systems
       if: inputs.emulate-systems != ''
       shell: bash
-      run: docker run --privileged --rm tonistiigi/binfmt --install all
+      run: docker run --privileged --rm tonistiigi/binfmt:qemu-v9.2.2 --install all
 
     - name: Allow emulated platforms in Nix
       if: inputs.emulate-systems != ''
       shell: bash
+      env:
+        EMULATE_SYSTEMS: ${{ inputs.emulate-systems }}
       run: |
         mkdir -p ~/.config/nix
-        echo "extra-platforms = ${{ inputs.emulate-systems }}" >> ~/.config/nix/nix.conf
+        echo "extra-platforms = $EMULATE_SYSTEMS" >> ~/.config/nix/nix.conf
 
     - name: nix flake check
       if: inputs.flake-check == 'true' && inputs.export-devshell != 'true'
       shell: bash
-      run: nix flake check ${{ inputs.flake-check-args }}
+      env:
+        FLAKE_CHECK_ARGS: ${{ inputs.flake-check-args }}
+      run: nix flake check $FLAKE_CHECK_ARGS
 
     - name: nix build
       if: (inputs.build-attrs != '' || inputs.build-hosts == 'true' || inputs.build-devshells == 'true') && inputs.export-devshell != 'true'
       shell: bash
       env:
         GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+        BUILD_HOSTS: ${{ inputs.build-hosts }}
+        BUILD_DEVSHELLS: ${{ inputs.build-devshells }}
+        BUILD_ATTRS: ${{ inputs.build-attrs }}
+        BUILD_ARGS: ${{ inputs.build-args }}
+        MATRIX_NAME: ${{ inputs.matrix-name }}
+        CHECKS: ${{ inputs.checks }}
+        HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
       run: |
         set -uo pipefail
 
@@ -270,7 +284,7 @@ runs:
         add() { [ -n "$1" ] || return 0; pairs="${pairs:+$pairs$nl}$1"; }
         arg() { inline_args="${inline_args:+$inline_args }$1"; }
 
-        if [ "${{ inputs.build-hosts }}" = "true" ]; then
+        if [ "$BUILD_HOSTS" = "true" ]; then
           hosts="$(nix eval --raw '.#nixosConfigurations' \
             --apply 'cfgs: builtins.concatStringsSep "\n" (builtins.attrNames cfgs)' || true)"
           while IFS= read -r h; do
@@ -279,7 +293,7 @@ runs:
           done <<< "$hosts"
         fi
 
-        if [ "${{ inputs.build-devshells }}" = "true" ]; then
+        if [ "$BUILD_DEVSHELLS" = "true" ]; then
           for s in $(nix config show system) $(nix config show extra-platforms); do
             names="$(nix eval --raw ".#devShells.\"$s\"" \
               --apply 'ds: builtins.concatStringsSep "\n" (builtins.attrNames ds)' 2>/dev/null || true)"
@@ -290,13 +304,13 @@ runs:
           done
         fi
 
-        if [ "${{ inputs.build-attrs }}" = "matrix" ]; then
-          add "$(nix eval --raw ".#githubActions.${{ inputs.matrix-name }}" \
+        if [ "$BUILD_ATTRS" = "matrix" ]; then
+          add "$(nix eval --raw ".#githubActions.$MATRIX_NAME" \
             --apply 'm: builtins.concatStringsSep "\n"
                        (map (e: (e.name or e.attr) + "\t" + ".#" + (e.attr or e.name)) m.include)')"
-        elif [ -n "${{ inputs.build-attrs }}" ]; then
+        elif [ -n "$BUILD_ATTRS" ]; then
           expect_value=0
-          for tok in ${{ inputs.build-attrs }}; do
+          for tok in $BUILD_ATTRS; do
             if [ "$expect_value" = 1 ]; then
               arg "$tok"; expect_value=0
             elif [ "${tok#-}" != "$tok" ]; then
@@ -315,17 +329,17 @@ runs:
           exit 0
         fi
 
-        if [ "${{ inputs.checks }}" != "true" ]; then
+        if [ "$CHECKS" != "true" ]; then
           attrs="$(printf '%s\n' "$pairs" | cut -f2 | tr '\n' ' ')"
           echo "Building: ${attrs}"
-          exec nix build ${{ inputs.build-args }} ${inline_args} ${attrs}
+          exec nix build ${BUILD_ARGS} ${inline_args} ${attrs}
         fi
 
         # Opt-in: one check run per build, individual status in the PR Checks tab.
         # The default shell runs with `-e`; turn it off so one failed build or
         # API call does not abort the loop, and drive the exit code ourselves.
         set +e
-        sha="${{ github.event.pull_request.head.sha || github.sha }}"
+        sha="$HEAD_SHA"
         declare -A pending
         finish() {
           node -e '
@@ -366,7 +380,7 @@ runs:
           pending[$id]=1
           logf="$(mktemp)"
           echo "::group::build ${name}"
-          if nix build ${{ inputs.build-args }} ${inline_args} "$attr" 2>&1 | tee "$logf"; then
+          if nix build ${BUILD_ARGS} ${inline_args} "$attr" 2>&1 | tee "$logf"; then
             finish "$id" success "$name" "$logf"
           else
             finish "$id" failure "$name" "$logf"
@@ -383,4 +397,5 @@ runs:
       shell: bash
       env:
         NIX_ACTION_RUN: ${{ inputs.run }}
-      run: nix develop ${{ inputs.devshell }} --command bash -c "$NIX_ACTION_RUN"
+        DEVSHELL: ${{ inputs.devshell }}
+      run: nix develop $DEVSHELL --command bash -c "$NIX_ACTION_RUN"

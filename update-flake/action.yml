@@ -32,6 +32,10 @@ inputs:
     description: '"true" to install Nix (hosted runners). "false" for self-hosted with Nix.'
     required: false
     default: "false"
+  checkout:
+    description: '"true" to checkout the repo first. Set "false" if the job already did.'
+    required: false
+    default: "true"
   reviewers:
     description: "Comma-separated PR reviewers."
     required: false
@@ -81,6 +85,7 @@ runs:
       run: echo "token=${APP_TOKEN}" >> "$GITHUB_OUTPUT"
 
     - name: Checkout
+      if: inputs.checkout == 'true'
       uses: actions/checkout@v6
       with:
         ref: ${{ inputs.base-branch }}
