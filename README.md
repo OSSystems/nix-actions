@@ -32,8 +32,23 @@ The action checks out the repo by default, so the snippet above already runs
 `nix flake check` and, with no extra inputs, builds every `nixosConfigurations`
 host and every `devShells` entry the flake exposes (`build-hosts` and
 `build-devshells` default on; a flake with neither builds nothing). Set them to
-`"false"` to opt out. See [`examples/`](./examples) for self-hosted, ubuntu,
-explicit-build, artifact and update-flake callers.
+`"false"` to opt out.
+
+On a GitHub-hosted runner (no Nix preinstalled), set `install-nix: true` to
+install Nix and restore the store cache:
+
+```yaml
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: ossystems/nix-actions@v1
+        with:
+          install-nix: true   # public flake, no token needed
+```
+
+See [`examples/`](./examples) for self-hosted, ubuntu, explicit-build, artifact
+and update-flake callers.
 
 ## `nix-actions` (CI) inputs
 
