@@ -38,7 +38,8 @@ explicit-build, artifact and update-flake callers.
 | Input | Default | Description |
 |-------|---------|-------------|
 | `token-owner` | `""` | Org to scope a GitHub App token to (private flake inputs). Empty disables the token. |
-| `app-id` | `""` | GitHub App ID. Required when `token-owner` is set. |
+| `client-id` | `""` | GitHub App Client ID. Preferred over `app-id`. Required when `token-owner` is set. |
+| `app-id` | `""` | **Deprecated** — use `client-id`. GitHub App ID, used only when `token-owner` is set and `client-id` is empty. |
 | `app-private-key` | `""` | GitHub App private key. Required when `token-owner` is set. |
 | `install-nix` | `"false"` | `"true"` to install Nix + restore cache (hosted runners). `"false"` on self-hosted with Nix. |
 | `checkout` | `"true"` | `"true"` to checkout first. Set `"false"` if the job already checked out. |
@@ -71,7 +72,8 @@ The job must set `permissions: { contents: write, pull-requests: write }`.
 |-------|---------|-------------|
 | `base-branch` | `main` | Branch to update against. |
 | `token-owner` | `""` | Org for the App token. Empty falls back to `GITHUB_TOKEN`. |
-| `app-id` | `""` | GitHub App ID. Required when `token-owner` is set. |
+| `client-id` | `""` | GitHub App Client ID. Preferred over `app-id`. Required when `token-owner` is set. |
+| `app-id` | `""` | **Deprecated** — use `client-id`. GitHub App ID, used only when `token-owner` is set and `client-id` is empty. |
 | `app-private-key` | `""` | GitHub App private key. Required when `token-owner` is set. |
 | `install-nix` | `"false"` | `"true"` to install Nix (hosted runners). |
 | `reviewers` | `""` | Comma-separated PR reviewers. |
@@ -81,8 +83,8 @@ The job must set `permissions: { contents: write, pull-requests: write }`.
 
 ## Secrets
 
-Pass secrets explicitly as inputs (`app-id: ${{ secrets.RUNNER_APP_ID }}`). Only
-needed when `token-owner` is set.
+Pass secrets explicitly as inputs (`client-id: ${{ secrets.RUNNER_CLIENT_ID }}`).
+Only needed when `token-owner` is set.
 
 ## Matrix builds
 

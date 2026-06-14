@@ -13,5 +13,5 @@ jobs:
       - uses: ossystems/nix-actions@v1
         with:
           token-owner: my-org   # org for the GitHub App token (private flake inputs)
-          app-id: ${{ secrets.RUNNER_APP_ID }}
+          client-id: ${{ secrets.RUNNER_CLIENT_ID }}
           app-private-key: ${{ secrets.RUNNER_APP_PRIVATE_KEY }}
