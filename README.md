@@ -13,6 +13,19 @@ They run as a **step inside your job**: you pick the runner and can add your own
 steps - artifact upload, deploy - before or after, on the same runner and Nix
 store.
 
+## Contents
+
+- [Quick start](#quick-start)
+- [`nix-actions` (CI) inputs](#nix-actions-ci-inputs)
+- [`update-flake` inputs](#update-flake-inputs)
+- [Secrets](#secrets)
+- [Matrix builds](#matrix-builds) — [NixOS hosts](#nixos-hosts),
+  [dev shells](#dev-shells), [emulated cross-arch](#emulated-cross-arch),
+  [status per build](#status-per-build)
+- [Run in a dev shell](#run-in-a-dev-shell)
+- [Load a dev shell into the whole job](#load-a-dev-shell-into-the-whole-job-export-devshell)
+- [License](#license)
+
 ## Quick start
 
 ```yaml
@@ -83,7 +96,31 @@ later steps can reuse it.
 
 ## `update-flake` inputs
 
-The job must set `permissions: { contents: write, pull-requests: write }`.
+Bumps `flake.lock` on a schedule and opens a PR (optionally auto-merged). The
+job must set `permissions: { contents: write, pull-requests: write }`:
+
+```yaml
+name: update-flakes
+on:
+  schedule:
+    - cron: "0 0 * * 0"   # Sunday 00:00
+  workflow_dispatch:
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: ossystems/nix-actions/update-flake@v1
+        with:
+          install-nix: true   # omit on self-hosted runners with Nix
+```
+
+With `token-owner` unset (above) it uses the default `GITHUB_TOKEN`. For private
+flake inputs, scope a GitHub App token by also passing `token-owner`,
+`client-id` and `app-private-key`.
 
 | Input | Default | Description |
 |-------|---------|-------------|
@@ -252,3 +289,7 @@ jobs:
 
 Run `nix flake check` in a separate job (the same action with `export-devshell`
 off), the way these repos already keep check and build as separate jobs.
+
+## License
+
+[MIT](./LICENSE) © O.S. Systems Software LTDA.
