@@ -28,6 +28,9 @@ store.
 
 ## Quick start
 
+On a GitHub-hosted runner (no Nix preinstalled), set `install-nix: true` to
+install Nix and restore the store cache:
+
 ```yaml
 name: CI
 on:
@@ -36,9 +39,11 @@ on:
 
 jobs:
   ci:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     steps:
       - uses: ossystems/nix-actions@v1
+        with:
+          install-nix: true   # public flake, no token needed
 ```
 
 The action checks out the repo by default, so the snippet above already runs
@@ -47,17 +52,15 @@ host and every `devShells` entry the flake exposes (`build-hosts` and
 `build-devshells` default on; a flake with neither builds nothing). Set them to
 `"false"` to opt out.
 
-On a GitHub-hosted runner (no Nix preinstalled), set `install-nix: true` to
-install Nix and restore the store cache:
+On a self-hosted runner that already has Nix, drop `install-nix` (it defaults to
+`"false"`):
 
 ```yaml
 jobs:
   ci:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - uses: ossystems/nix-actions@v1
-        with:
-          install-nix: true   # public flake, no token needed
 ```
 
 See [`examples/`](./examples) for self-hosted, ubuntu, explicit-build, artifact
