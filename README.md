@@ -1,5 +1,7 @@
 # nix-actions
 
+[![GitHub Marketplace](https://img.shields.io/badge/Marketplace-OSSystems%20Nix%20Actions-blue?logo=github)](https://github.com/marketplace/actions/ossystems-nix-actions)
+
 Composite GitHub Actions for Nix flake repos. Replaces copy-pasted CI and
 flake-update boilerplate with two actions you drop into a job step.
 
