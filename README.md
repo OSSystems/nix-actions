@@ -76,6 +76,7 @@ The job must set `permissions: { contents: write, pull-requests: write }`.
 | `app-id` | `""` | **Deprecated** — use `client-id`. GitHub App ID, used only when `token-owner` is set and `client-id` is empty. |
 | `app-private-key` | `""` | GitHub App private key. Required when `token-owner` is set. |
 | `install-nix` | `"false"` | `"true"` to install Nix (hosted runners). |
+| `checkout` | `"true"` | `"true"` to checkout first. Set `"false"` if the job already checked out. |
 | `reviewers` | `""` | Comma-separated PR reviewers. |
 | `pr-labels` | `dependencies\nautomated` | Newline-separated PR labels. |
 | `auto-merge` | `"true"` | Enable PR auto-merge. |
