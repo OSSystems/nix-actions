@@ -12,8 +12,16 @@ inputs:
     description: "Org for the GitHub App token. Empty falls back to the default GITHUB_TOKEN."
     required: false
     default: ""
+  client-id:
+    description: >-
+      GitHub App Client ID. Preferred over app-id. Required when token-owner is
+      set (unless app-id is given).
+    required: false
+    default: ""
   app-id:
-    description: "GitHub App ID. Required when token-owner is set."
+    description: >-
+      GitHub App ID. Deprecated: pass client-id instead. Used only when
+      token-owner is set and client-id is empty.
     required: false
     default: ""
   app-private-key:
@@ -46,14 +54,31 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Generate GitHub App token
-      id: app-token
-      if: inputs.token-owner != ''
+    - name: Generate GitHub App token (client-id)
+      id: app-token-client
+      if: inputs.token-owner != '' && inputs.client-id != ''
+      uses: actions/create-github-app-token@v3
+      with:
+        client-id: ${{ inputs.client-id }}
+        private-key: ${{ inputs.app-private-key }}
+        owner: ${{ inputs.token-owner }}
+
+    - name: Generate GitHub App token (app-id, deprecated)
+      id: app-token-legacy
+      if: inputs.token-owner != '' && inputs.client-id == '' && inputs.app-id != ''
       uses: actions/create-github-app-token@v3
       with:
         app-id: ${{ inputs.app-id }}
         private-key: ${{ inputs.app-private-key }}
         owner: ${{ inputs.token-owner }}
+
+    - name: Resolve GitHub App token
+      id: app-token
+      if: inputs.token-owner != ''
+      shell: bash
+      env:
+        APP_TOKEN: ${{ steps.app-token-client.outputs.token || steps.app-token-legacy.outputs.token }}
+      run: echo "token=${APP_TOKEN}" >> "$GITHUB_OUTPUT"
 
     - name: Checkout
       uses: actions/checkout@v6

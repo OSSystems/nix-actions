@@ -16,7 +16,7 @@ jobs:
         with:
           base-branch: master         # or main
           token-owner: my-org         # org for the GitHub App token
-          app-id: ${{ secrets.UPDATE_FLAKE_APP_ID }}
+          client-id: ${{ secrets.UPDATE_FLAKE_CLIENT_ID }}
           app-private-key: ${{ secrets.UPDATE_FLAKE_APP_PRIVATE_KEY }}
           auto-merge: true            # optional
           merge-method: rebase        # rebase | merge | squash

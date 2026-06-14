@@ -15,6 +15,6 @@ jobs:
       - uses: ossystems/nix-actions@v1
         with:
           token-owner: my-org   # org for the GitHub App token
-          app-id: ${{ secrets.RUNNER_APP_ID }}
+          client-id: ${{ secrets.RUNNER_CLIENT_ID }}
           app-private-key: ${{ secrets.RUNNER_APP_PRIVATE_KEY }}
           build-attrs: ".#my-package .#nixosConfigurations.my-host.config.system.build.toplevel"
