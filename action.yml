@@ -1,8 +1,7 @@
-name: "Nix CI"
+name: "OSSystems Nix Actions"
 description: >-
-  Run `nix flake check` and optionally `nix build` explicit attributes for a Nix
-  flake. Runs as a step inside your job, so you choose the runner and can add
-  your own steps (artifact upload, deploy) before/after on the same runner.
+  Run nix flake check and nix build (checks, hosts, dev shells) for a Nix flake,
+  as a step inside your own job.
 
 inputs:
   token-owner:
@@ -150,6 +149,10 @@ inputs:
       ssh-private-key is set.
     required: false
     default: "github.com"
+
+branding:
+  icon: "box"
+  color: "blue"
 
 outputs:
   token:
