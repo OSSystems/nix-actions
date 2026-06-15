@@ -46,6 +46,14 @@ inputs:
     default: |
       dependencies
       automated
+  pr-title:
+    description: "Title of the PR, and the flake.lock commit summary."
+    required: false
+    default: "Update flake.lock"
+  pr-branch:
+    description: "Head branch the action pushes the update PR to."
+    required: false
+    default: "update_flake_lock_action"
   auto-merge:
     description: '"true" to enable PR auto-merge after creation.'
     required: false
@@ -97,16 +105,44 @@ runs:
 
     - name: Update flake.lock
       id: update
-      uses: DeterminateSystems/update-flake-lock@v28
+      shell: bash
+      env:
+        PR_TITLE: ${{ inputs.pr-title }}
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        tip="$(git rev-parse HEAD)"
+        nix flake update --commit-lock-file \
+          --commit-lock-file-summary "$PR_TITLE"
+        if [ "$tip" != "$(git rev-parse HEAD)" ]; then
+          # Grab Nix's per-input changelog from its commit, then unwind it so
+          # create-pull-request makes the real commit/branch/author.
+          {
+            echo "updated=true"
+            echo "body<<__NIX_BODY_EOF__"
+            git log -1 --format=%b
+            echo "__NIX_BODY_EOF__"
+          } >> "$GITHUB_OUTPUT"
+          git reset --soft "$tip"
+        fi
+
+    - name: Create PR
+      id: create-pr
+      if: steps.update.outputs.updated == 'true'
+      uses: peter-evans/create-pull-request@v8
       with:
         token: ${{ steps.app-token.outputs.token || github.token }}
-        pr-title: "Update flake.lock"
-        pr-labels: ${{ inputs.pr-labels }}
-        pr-reviewers: ${{ inputs.reviewers }}
+        base: ${{ inputs.base-branch }}
+        branch: ${{ inputs.pr-branch }}
+        delete-branch: true
+        title: ${{ inputs.pr-title }}
+        body: ${{ steps.update.outputs.body }}
+        labels: ${{ inputs.pr-labels }}
+        reviewers: ${{ inputs.reviewers }}
 
     - name: Auto merge
-      if: inputs.auto-merge == 'true' && steps.update.outputs.pull-request-number != ''
+      if: inputs.auto-merge == 'true' && steps.create-pr.outputs.pull-request-number != ''
       shell: bash
-      run: gh pr merge --auto --${{ inputs.merge-method }} ${{ steps.update.outputs.pull-request-number }}
+      run: gh pr merge --auto --${{ inputs.merge-method }} ${{ steps.create-pr.outputs.pull-request-number }}
       env:
         GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
