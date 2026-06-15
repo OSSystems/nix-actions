@@ -29,3 +29,13 @@ Two kinds of tags, both on the same release commit:
 
 For a docs/non-release change that should reach `@v1` callers without a new
 version, just move the major tag: `git tag -f v1 HEAD && git push -f origin v1`.
+
+## Exceptions
+
+- **`v1.0.1` was amended after publishing (2026-06-15).** It shipped with a
+  regression that made `update-flake` PRs land a placeholder commit message
+  (`[create-pull-request] automated change`). Because adoption was negligible,
+  the fix was force-pushed onto the existing `v1.0.1` and `v1` tags instead of
+  cutting a `v1.0.2`. This is a deliberate one-off departure from the immutable
+  `vX.Y.Z` rule above; don't treat it as precedent for moving published patch
+  tags once a release has real users.
