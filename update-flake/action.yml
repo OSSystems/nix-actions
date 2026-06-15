@@ -136,6 +136,10 @@ runs:
         branch: ${{ inputs.pr-branch }}
         delete-branch: true
         title: ${{ inputs.pr-title }}
+        commit-message: |
+          ${{ inputs.pr-title }}
+
+          ${{ steps.update.outputs.body }}
         body: ${{ steps.update.outputs.body }}
         labels: ${{ inputs.pr-labels }}
         reviewers: ${{ inputs.reviewers }}
