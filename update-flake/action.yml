@@ -108,6 +108,9 @@ runs:
       shell: bash
       env:
         PR_TITLE: ${{ inputs.pr-title }}
+        NIX_CONFIG: |
+          access-tokens = github.com=${{ steps.app-token.outputs.token || github.token }}
+          accept-flake-config = true
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
