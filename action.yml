@@ -90,11 +90,12 @@ inputs:
     description: >-
       "true" (default) to build every `.#devShells.<system>.<name>` in this one
       job, warming the dev environment cache with no githubActions matrix to
-      maintain. Only the systems this runner can build (its `system` plus
-      `extra-platforms`, which emulate-systems feeds) are attempted. Each build is
-      labelled `devshell-<name>-<system>` (use with checks). Combines with
-      build-attrs and build-hosts. "false" to skip. When the flake exposes no
-      `devShells`, nothing is built.
+      maintain. Builds the runner's native `system` plus only the platforms
+      explicitly listed in `emulate-systems` (not the daemon's global
+      `extra-platforms`, which a self-hosted runner may set for unrelated
+      cross-builds). Each build is labelled `devshell-<name>-<system>` (use with
+      checks). Combines with build-attrs and build-hosts. "false" to skip. When
+      the flake exposes no `devShells`, nothing is built.
     required: false
     default: "true"
   emulate-systems:
@@ -273,6 +274,7 @@ runs:
         GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
         BUILD_HOSTS: ${{ inputs.build-hosts }}
         BUILD_DEVSHELLS: ${{ inputs.build-devshells }}
+        EMULATE_SYSTEMS: ${{ inputs.emulate-systems }}
         BUILD_ATTRS: ${{ inputs.build-attrs }}
         BUILD_ARGS: ${{ inputs.build-args }}
         MATRIX_NAME: ${{ inputs.matrix-name }}
@@ -297,7 +299,7 @@ runs:
         fi
 
         if [ "$BUILD_DEVSHELLS" = "true" ]; then
-          for s in $(nix config show system) $(nix config show extra-platforms); do
+          for s in $(nix config show system) $EMULATE_SYSTEMS; do
             names="$(nix eval --raw ".#devShells.\"$s\"" \
               --apply 'ds: builtins.concatStringsSep "\n" (builtins.attrNames ds)' 2>/dev/null || true)"
             while IFS= read -r n; do
