@@ -21,6 +21,7 @@ jobs:
           install-nix: true
           build-hosts: false
           build-devshells: false
+          build-packages: false
           build-attrs: ".#packages.x86_64-linux.pkgA .#packages.x86_64-linux.pkgB -o result-pkg"
           devshell: ".#ci"
           run: jq --version
@@ -57,6 +58,7 @@ jobs:
           flake-check: false
           build-hosts: false
           build-devshells: false
+          build-packages: false
           build-attrs: matrix
           checks: true
 

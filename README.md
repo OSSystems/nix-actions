@@ -48,9 +48,9 @@ jobs:
 
 The action checks out the repo by default, so the snippet above already runs
 `nix flake check` and, with no extra inputs, builds every `nixosConfigurations`
-host and every `devShells` entry the flake exposes (`build-hosts` and
-`build-devshells` default on; a flake with neither builds nothing). Set them to
-`"false"` to opt out.
+host, every `packages` and every `devShells` entry the flake exposes
+(`build-hosts`, `build-packages` and `build-devshells` default on; a flake with
+none builds nothing). Set them to `"false"` to opt out.
 
 On a self-hosted runner that already has Nix, drop `install-nix` (it defaults to
 `"false"`):
@@ -86,6 +86,7 @@ and update-flake callers.
 | `matrix-name` | `matrix` | When `build-attrs` is `matrix`, which `.#githubActions.<name>` to read the list from. |
 | `build-hosts` | `"true"` | Build `config.system.build.toplevel` of every `.#nixosConfigurations` entry in one job (default on). Labelled by host name. `"false"` to skip. Combines with `build-attrs`. Flakes with no hosts build nothing. |
 | `build-devshells` | `"true"` | Build every `.#devShells.<system>.<name>` in one job (default on), for the systems this runner can build (`system` plus `extra-platforms`). Labelled `devshell-<name>-<system>`. `"false"` to skip. Combines with `build-attrs` and `build-hosts`. Flakes with no dev shells build nothing. |
+| `build-packages` | `"true"` | Build every `.#packages.<system>.<name>` in one job (default on), for the runner's native `system` plus the platforms listed in `emulate-systems`. Labelled `package-<name>-<system>`. `"false"` to skip. Combines with `build-attrs`, `build-hosts` and `build-devshells`. Flakes with no packages build nothing. |
 | `emulate-systems` | `""` | Space-separated extra Linux platforms to build under QEMU (e.g. `aarch64-linux`). Registers binfmt and adds them to `extra-platforms`. Empty disables emulation. |
 | `checks` | `"false"` | `"true"` to report each built attribute as its own check run (one status per build in the PR Checks tab), instead of one combined build. Needs `checks:write`. Serializes the builds. |
 | `run` | `""` | Command to run inside a dev shell (`nix develop --command`). Empty skips it. |
