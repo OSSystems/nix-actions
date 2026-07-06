@@ -62,6 +62,29 @@ inputs:
     description: "Auto-merge method: rebase | merge | squash."
     required: false
     default: "rebase"
+  post-run:
+    description: >-
+      Command to run after `nix flake update` (e.g. regenerate lock-derived
+      files like Cargo.nix). Runs against the updated flake; its file changes are
+      picked up into the update PR commit. When set with token-owner, the App
+      token is re-minted after it so a long post-run can't expire the token
+      before the PR is opened. Empty skips it.
+    required: false
+    default: ""
+  export-devshell:
+    description: >-
+      "true" to load a dev shell into the environment before `post-run`, so the
+      command runs inside it (env-export via nicknovitski/nix-develop). The shell
+      is `devshell`, defaulting to the flake's default dev shell. "false" runs
+      `post-run` in a plain bash shell.
+    required: false
+    default: "false"
+  devshell:
+    description: >-
+      Installable for the dev shell (e.g. '.#ci') loaded when export-devshell is
+      "true". Empty uses the flake's default dev shell.
+    required: false
+    default: ""
 
 runs:
   using: "composite"
@@ -129,12 +152,53 @@ runs:
           git reset --soft "$tip"
         fi
 
+    - name: Load dev shell into environment
+      if: inputs.post-run != '' && inputs.export-devshell == 'true'
+      uses: nicknovitski/nix-develop@v1
+      with:
+        arguments: ${{ inputs.devshell }}
+      env:
+        NIX_CONFIG: |
+          access-tokens = github.com=${{ steps.app-token.outputs.token || github.token }}
+          accept-flake-config = true
+
+    - name: Post-run
+      if: inputs.post-run != ''
+      shell: bash
+      env:
+        NIX_ACTION_POST_RUN: ${{ inputs.post-run }}
+        NIX_CONFIG: |
+          access-tokens = github.com=${{ steps.app-token.outputs.token || github.token }}
+          accept-flake-config = true
+      run: bash -c "$NIX_ACTION_POST_RUN"
+
+    # A post-run may take longer than the App token's 60-minute lifetime, which
+    # would expire it before the PR is opened. Re-mint right before the PR so the
+    # action is correct by default, with no flag for the user to remember.
+    - name: Re-mint GitHub App token (client-id)
+      id: app-token-remint-client
+      if: inputs.post-run != '' && inputs.token-owner != '' && inputs.client-id != '' && steps.update.outputs.updated == 'true'
+      uses: actions/create-github-app-token@v3
+      with:
+        client-id: ${{ inputs.client-id }}
+        private-key: ${{ inputs.app-private-key }}
+        owner: ${{ inputs.token-owner }}
+
+    - name: Re-mint GitHub App token (app-id, deprecated)
+      id: app-token-remint-legacy
+      if: inputs.post-run != '' && inputs.token-owner != '' && inputs.client-id == '' && inputs.app-id != '' && steps.update.outputs.updated == 'true'
+      uses: actions/create-github-app-token@v3
+      with:
+        app-id: ${{ inputs.app-id }}
+        private-key: ${{ inputs.app-private-key }}
+        owner: ${{ inputs.token-owner }}
+
     - name: Create PR
       id: create-pr
       if: steps.update.outputs.updated == 'true'
       uses: peter-evans/create-pull-request@v8
       with:
-        token: ${{ steps.app-token.outputs.token || github.token }}
+        token: ${{ steps.app-token-remint-client.outputs.token || steps.app-token-remint-legacy.outputs.token || steps.app-token.outputs.token || github.token }}
         committer: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
         author: github-actions[bot] <github-actions[bot]@users.noreply.github.com>
         base: ${{ inputs.base-branch }}
@@ -154,4 +218,4 @@ runs:
       shell: bash
       run: gh pr merge --auto --${{ inputs.merge-method }} ${{ steps.create-pr.outputs.pull-request-number }}
       env:
-        GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+        GH_TOKEN: ${{ steps.app-token-remint-client.outputs.token || steps.app-token-remint-legacy.outputs.token || steps.app-token.outputs.token || github.token }}
