@@ -15,7 +15,7 @@ store.
 
 ## Contents
 
-- [Quick start](#quick-start)
+- [Quick start](#quick-start) — [installing Nix](#installing-nix)
 - [`nix-actions` (CI) inputs](#nix-actions-ci-inputs)
 - [`update-flake` inputs](#update-flake-inputs)
 - [Secrets](#secrets)
@@ -63,6 +63,23 @@ jobs:
       - uses: ossystems/nix-actions@v1
 ```
 
+### Installing Nix
+
+With `install-nix: true` the action downloads the Nix archive itself, checks it,
+and hands the verified file to
+[`nix-quick-install-action`](https://github.com/nixbuild/nix-quick-install-action)
+through that action's `nix_archives_url`. It does this because
+`nix-quick-install-action` pipes its own download straight into `tar`: when
+GitHub serves a truncated release asset — which it does from time to time — the
+body cannot be retried, and the job dies with `zstd: unexpected end of file`
+before any of your own tools run.
+
+The download is therefore retried three times, with a growing wait, and each
+attempt is checked for integrity before it is accepted. A download that never
+arrives intact fails the step with a message that names the URL, not the
+extraction. A 404 is reported at once, because it means `nix-version` is not a
+version the pinned `nix-quick-install-action` release ships.
+
 See [`examples/`](./examples) for self-hosted, ubuntu, explicit-build, artifact
 and update-flake callers.
 
@@ -75,6 +92,7 @@ and update-flake callers.
 | `app-id` | `""` | **Deprecated** — use `client-id`. GitHub App ID, used only when `token-owner` is set and `client-id` is empty. |
 | `app-private-key` | `""` | GitHub App private key. Required when `token-owner` is set. |
 | `install-nix` | `"false"` | `"true"` to install Nix + restore cache (hosted runners). `"false"` on self-hosted with Nix. |
+| `nix-version` | `"2.29.2"` | Nix version to install when `install-nix` is `"true"`. Must be a version the pinned `nix-quick-install-action` release ships. |
 | `checkout` | `"true"` | `"true"` to checkout first. Set `"false"` if the job already checked out. |
 | `fetch-depth` | `"1"` | Checkout fetch-depth. |
 | `ref` | `""` | Git ref to checkout (when `checkout` is true). Empty uses the ref that triggered the run. |
@@ -133,7 +151,8 @@ flake inputs, scope a GitHub App token by also passing `token-owner`,
 | `client-id` | `""` | GitHub App Client ID. Preferred over `app-id`. Required when `token-owner` is set. |
 | `app-id` | `""` | **Deprecated** — use `client-id`. GitHub App ID, used only when `token-owner` is set and `client-id` is empty. |
 | `app-private-key` | `""` | GitHub App private key. Required when `token-owner` is set. |
-| `install-nix` | `"false"` | `"true"` to install Nix (hosted runners). |
+| `install-nix` | `"false"` | `"true"` to install Nix (hosted runners). Uses the same checked download as the CI action — see [installing Nix](#installing-nix). |
+| `nix-version` | `"2.29.2"` | Nix version to install when `install-nix` is `"true"`. Must be a version the pinned `nix-quick-install-action` release ships. |
 | `checkout` | `"true"` | `"true"` to checkout first. Set `"false"` if the job already checked out. |
 | `reviewers` | `""` | Comma-separated PR reviewers. |
 | `pr-labels` | `dependencies\nautomated` | Newline-separated PR labels. |
