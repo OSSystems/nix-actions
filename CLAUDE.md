@@ -10,6 +10,11 @@ Marketplace as **OSSystems Nix Actions**
 - `update-flake/action.yml` — sub-action, used as
   `OSSystems/nix-actions/update-flake@v1`. Not separately listed (one
   Marketplace listing per repo).
+- `scripts/` — shell helpers the root action runs through
+  `$GITHUB_ACTION_PATH`.
+- `tests/` — runnable tests for those helpers. `tests/*.test.sh` runs on a bare
+  runner (no Nix), so it still reports when the Nix install itself is broken.
+  Run one directly: `tests/prefetch-nix-archive.test.sh`.
 
 ## Guides
 

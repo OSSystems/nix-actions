@@ -32,6 +32,13 @@ inputs:
       Nix). "false" for self-hosted runners that already have Nix.
     required: false
     default: "false"
+  nix-version:
+    description: >-
+      Nix version to install when install-nix is "true". It must be one of the
+      versions the pinned nix-quick-install-action release ships; the default
+      tracks that release's own default.
+    required: false
+    default: "2.29.2"
   checkout:
     description: '"true" to checkout the repo first. Set "false" if the job already did.'
     required: false
@@ -241,9 +248,28 @@ runs:
         ref: ${{ inputs.ref }}
         fetch-depth: ${{ inputs.fetch-depth }}
 
+    # nix-quick-install-action pipes its download into tar, so a truncated body
+    # from GitHub cannot be retried and fails the job with an extraction error.
+    # Fetching the same archive to a file first makes it verifiable, and gives
+    # the failure a message that names the download.
+    - name: Pre-fetch the Nix archive
+      id: nix-archive
+      if: inputs.install-nix == 'true'
+      shell: bash
+      env:
+        # This tag must match the nix-quick-install-action pin below; the test
+        # suite fails if the two drift.
+        NIX_QUICK_INSTALL_RELEASE: v34
+        NIX_VERSION: ${{ inputs.nix-version }}
+        DEST_DIR: ${{ runner.temp }}/nix-archives
+      run: "$GITHUB_ACTION_PATH/scripts/prefetch-nix-archive.sh"
+
     - name: Install Nix
       if: inputs.install-nix == 'true'
       uses: nixbuild/nix-quick-install-action@v34
+      with:
+        nix_version: ${{ inputs.nix-version }}
+        nix_archives_url: file://${{ steps.nix-archive.outputs.dir }}
 
     - name: Restore and cache Nix store
       if: inputs.install-nix == 'true'
