@@ -39,6 +39,29 @@ inputs:
       tracks that release's own default.
     required: false
     default: "2.29.2"
+  cache-key-suffix:
+    description: >-
+      Appended verbatim to the Nix store cache's primary key
+      (`nix-<runner OS>-<hash of flake.*>`) when install-nix is "true", so jobs
+      whose stores differ save separate caches instead of the first to save
+      winning. Include your own separator (e.g. "-rust"). A miss still warms up
+      from the newest cache under `nix-<runner OS>-`, whatever its suffix.
+    required: false
+    default: ""
+  cache-save:
+    description: >-
+      "true" to save the Nix store cache at the end of the job when install-nix
+      is "true". "false" restores only. Pull request caches are scoped to that
+      pull request, so passing `github.ref == 'refs/heads/main'` keeps them from
+      evicting the shared ones.
+    required: false
+    default: "true"
+  gc-max-store-size-linux:
+    description: >-
+      On Linux, collect garbage until the Nix store is at most this size (e.g.
+      "5G") before saving the cache. Empty saves the store as it is.
+    required: false
+    default: ""
   checkout:
     description: '"true" to checkout the repo first. Set "false" if the job already did.'
     required: false
@@ -178,6 +201,9 @@ outputs:
   token:
     description: "The minted GitHub App token, or empty when token-owner is unset."
     value: ${{ steps.app-token.outputs.token }}
+  cache-primary-key:
+    description: "The Nix store cache's primary key, or empty when install-nix is not \"true\"."
+    value: ${{ steps.nix-cache-key.outputs.key }}
 
 runs:
   using: "composite"
@@ -271,12 +297,24 @@ runs:
         nix_version: ${{ inputs.nix-version }}
         nix_archives_url: file://${{ steps.nix-archive.outputs.dir }}
 
+    # cache-nix-action declares a primary-key output but never sets it, so the
+    # key is named here and the action's own output reports this one.
+    - name: Name the Nix store cache key
+      id: nix-cache-key
+      if: inputs.install-nix == 'true'
+      shell: bash
+      env:
+        KEY: nix-${{ runner.os }}-${{ hashFiles('flake.*') }}${{ inputs.cache-key-suffix }}
+      run: echo "key=$KEY" >> "$GITHUB_OUTPUT"
+
     - name: Restore and cache Nix store
       if: inputs.install-nix == 'true'
       uses: nix-community/cache-nix-action@v7
       with:
-        primary-key: nix-${{ runner.os }}-${{ hashFiles('flake.*') }}
+        primary-key: ${{ steps.nix-cache-key.outputs.key }}
         restore-prefixes-first-match: nix-${{ runner.os }}-
+        save: ${{ inputs.cache-save }}
+        gc-max-store-size-linux: ${{ inputs.gc-max-store-size-linux }}
 
     - name: Load dev shell into job environment
       if: inputs.export-devshell == 'true'
