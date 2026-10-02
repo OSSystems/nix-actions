@@ -109,3 +109,70 @@ jobs:
         run: hello --version
       - name: Assert env vars from the dev shell reached this later step
         run: test "$NIX_ACTION_DEVELOP_SENTINEL" = loaded
+
+  # Each run caches under keys of its own, so cache-verify can tell a saved
+  # cache from a skipped one. The saving cell is the control: without it, "no
+  # cache under this key" would also pass if nothing were ever saved.
+  cache:
+    name: cache-key-suffix + cache-save=${{ matrix.save }}
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        save: [true, false]
+    steps:
+      - uses: actions/checkout@v6
+      - id: nix
+        uses: ./
+        with:
+          checkout: false
+          install-nix: true
+          flake-check: false
+          build-hosts: false
+          build-devshells: false
+          build-packages: false
+          cache-key-suffix: -test-${{ matrix.save }}-${{ github.run_id }}-${{ github.run_attempt }}
+          cache-save: ${{ matrix.save }}
+      - name: Assert the suffix ends the primary key
+        env:
+          KEY: ${{ steps.nix.outputs.cache-primary-key }}
+          WANT: nix-${{ runner.os }}-${{ hashFiles('flake.*') }}-test-${{ matrix.save }}-${{ github.run_id }}-${{ github.run_attempt }}
+        run: |
+          if [ "$KEY" != "$WANT" ]; then
+            echo "primary key is '$KEY', want '$WANT'"
+            exit 1
+          fi
+
+  cache-verify:
+    name: cache-save=false saves no cache, cache-save=true does
+    needs: cache
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/checkout@v6
+      - name: Name the keys the cache job used
+        run: |
+          base="nix-${{ runner.os }}-${{ hashFiles('flake.*') }}-test"
+          run="${{ github.run_id }}-${{ github.run_attempt }}"
+          echo "SAVED_KEY=$base-true-$run" >> "$GITHUB_ENV"
+          echo "SKIPPED_KEY=$base-false-$run" >> "$GITHUB_ENV"
+      - name: Assert cache-save=true saved its cache
+        run: |
+          gh cache list --key "$SAVED_KEY" --json key --jq '.[].key' | grep -Fx -- "$SAVED_KEY" \
+            || { echo "no cache saved under $SAVED_KEY"; exit 1; }
+      - name: Assert cache-save=false saved nothing
+        run: |
+          if gh cache list --key "$SKIPPED_KEY" --json key --jq '.[].key' | grep -Fx -- "$SKIPPED_KEY"; then
+            echo "a cache was saved under $SKIPPED_KEY"
+            exit 1
+          fi
+      - name: Delete this run's caches
+        if: always()
+        run: |
+          for key in "$SAVED_KEY" "$SKIPPED_KEY"; do
+            gh cache delete "$key" 2>/dev/null || true
+          done
