@@ -11,8 +11,8 @@
 # file first makes the body checkable, retryable, and reportable as a download.
 #
 # Inputs (environment):
-#   NIX_VERSION                 Nix version to fetch, e.g. 2.29.2
-#   NIX_QUICK_INSTALL_RELEASE   Release tag holding the archives, e.g. v34
+#   NIX_VERSION                 Nix version to fetch, e.g. 2.34.7
+#   NIX_QUICK_INSTALL_RELEASE   Release tag holding the archives, e.g. v35
 #   DEST_DIR                    Directory to store the archive in
 #   ARCHIVES_BASE_URL           Directory URL to fetch from (default: the
 #                               nix-quick-install-action release)
