@@ -15,7 +15,7 @@ jobs:
           flake-check: false   # build only
           build-attrs: ".#nixosConfigurations.my-host.config.system.build.sdImage"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: sd-image
           path: ./result/sd-image/*.img*

@@ -118,7 +118,7 @@ and update-flake callers.
 | `app-id` | `""` | **Deprecated** — use `client-id`. GitHub App ID, used only when `token-owner` is set and `client-id` is empty. |
 | `app-private-key` | `""` | GitHub App private key. Required when `token-owner` is set. |
 | `install-nix` | `"false"` | `"true"` to install Nix + restore cache (hosted runners). `"false"` on self-hosted with Nix. |
-| `nix-version` | `"2.29.2"` | Nix version to install when `install-nix` is `"true"`. Must be a version the pinned `nix-quick-install-action` release ships. |
+| `nix-version` | `"2.34.7"` | Nix version to install when `install-nix` is `"true"`. Must be a version the pinned `nix-quick-install-action` release ships. |
 | `cache-key-suffix` | `""` | Appended verbatim to the store cache's primary key (`nix-<OS>-<hash of flake.*>`), so jobs with different stores save separate caches. Include your own separator (e.g. `-rust`). See [the store cache](#the-store-cache). |
 | `cache-save` | `"true"` | `"true"` to save the store cache at the end of the job. `"false"` restores only. See [the store cache](#the-store-cache). |
 | `gc-max-store-size-linux` | `""` | On Linux, garbage-collect the store down to this size (e.g. `5G`) before saving the cache. Empty saves the store as it is. |
@@ -185,7 +185,7 @@ flake inputs, scope a GitHub App token by also passing `token-owner`,
 | `app-id` | `""` | **Deprecated** — use `client-id`. GitHub App ID, used only when `token-owner` is set and `client-id` is empty. |
 | `app-private-key` | `""` | GitHub App private key. Required when `token-owner` is set. |
 | `install-nix` | `"false"` | `"true"` to install Nix (hosted runners). Uses the same checked download as the CI action — see [installing Nix](#installing-nix). |
-| `nix-version` | `"2.29.2"` | Nix version to install when `install-nix` is `"true"`. Must be a version the pinned `nix-quick-install-action` release ships. |
+| `nix-version` | `"2.34.7"` | Nix version to install when `install-nix` is `"true"`. Must be a version the pinned `nix-quick-install-action` release ships. |
 | `checkout` | `"true"` | `"true"` to checkout first. Set `"false"` if the job already checked out. |
 | `reviewers` | `""` | Comma-separated PR reviewers. |
 | `pr-labels` | `dependencies\nautomated` | Newline-separated PR labels. |

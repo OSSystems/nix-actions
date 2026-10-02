@@ -38,7 +38,7 @@ inputs:
       versions the pinned nix-quick-install-action release ships; the default
       tracks that release's own default.
     required: false
-    default: "2.29.2"
+    default: "2.34.7"
   cache-key-suffix:
     description: >-
       Appended verbatim to the Nix store cache's primary key
@@ -269,7 +269,7 @@ runs:
 
     - name: Checkout
       if: inputs.checkout == 'true'
-      uses: actions/checkout@v6
+      uses: actions/checkout@v7
       with:
         ref: ${{ inputs.ref }}
         fetch-depth: ${{ inputs.fetch-depth }}
@@ -285,14 +285,14 @@ runs:
       env:
         # This tag must match the nix-quick-install-action pin below; the test
         # suite fails if the two drift.
-        NIX_QUICK_INSTALL_RELEASE: v34
+        NIX_QUICK_INSTALL_RELEASE: v35
         NIX_VERSION: ${{ inputs.nix-version }}
         DEST_DIR: ${{ runner.temp }}/nix-archives
       run: "$GITHUB_ACTION_PATH/scripts/prefetch-nix-archive.sh"
 
     - name: Install Nix
       if: inputs.install-nix == 'true'
-      uses: nixbuild/nix-quick-install-action@v34
+      uses: nixbuild/nix-quick-install-action@v35
       with:
         nix_version: ${{ inputs.nix-version }}
         nix_archives_url: file://${{ steps.nix-archive.outputs.dir }}
@@ -325,7 +325,7 @@ runs:
     - name: Register QEMU for emulated systems
       if: inputs.emulate-systems != ''
       shell: bash
-      run: docker run --privileged --rm tonistiigi/binfmt:qemu-v9.2.2 --install all
+      run: docker run --privileged --rm tonistiigi/binfmt:qemu-v10.2.3 --install all
 
     - name: Allow emulated platforms in Nix
       if: inputs.emulate-systems != ''
