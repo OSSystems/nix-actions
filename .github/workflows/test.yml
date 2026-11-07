@@ -109,6 +109,10 @@ jobs:
         run: hello --version
       - name: Assert env vars from the dev shell reached this later step
         run: test "$NIX_ACTION_DEVELOP_SENTINEL" = loaded
+      - name: Assert the dev shell survives a garbage collection
+        run: |
+          nix-store --gc
+          hello --version
 
   # Each run caches under keys of its own, so cache-verify can tell a saved
   # cache from a skipped one. The saving cell is the control: without it, "no
