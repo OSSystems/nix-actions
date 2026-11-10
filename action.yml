@@ -70,6 +70,10 @@ inputs:
     description: "Checkout fetch-depth (when checkout is true)."
     required: false
     default: "1"
+  persist-credentials:
+    description: '"true" to leave the token in .git/config after checkout, so later steps can push. "false" removes it, so the build and run steps cannot read it.'
+    required: false
+    default: "true"
   ref:
     description: "Git ref to checkout (when checkout is true). Empty uses the ref that triggered the run."
     required: false
@@ -273,6 +277,7 @@ runs:
       with:
         ref: ${{ inputs.ref }}
         fetch-depth: ${{ inputs.fetch-depth }}
+        persist-credentials: ${{ inputs.persist-credentials }}
 
     # nix-quick-install-action pipes its download into tar, so a truncated body
     # from GitHub cannot be retried and fails the job with an extraction error.
