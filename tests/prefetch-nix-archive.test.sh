@@ -208,9 +208,10 @@ check "the script reports the archive directory" "$(cat "$outputs")" "dir=$dest"
 # warms the wrong archive and the pinned action downloads unprotected. Every
 # action that installs Nix has to carry both halves.
 for manifest in action.yml update-flake/action.yml; do
-  pin="$(sed -n 's|.*uses: nixbuild/nix-quick-install-action@\([^ ]*\).*|\1|p' "$root/$manifest" | sort -u)"
+  # The action is pinned by commit, with the release it is in after the `#`.
+  pin="$(sed -n 's|.*uses: nixbuild/nix-quick-install-action@[0-9a-f]\{40\} # \([^ ]*\).*|\1|p' "$root/$manifest" | sort -u)"
   env_release="$(sed -n 's|.*NIX_QUICK_INSTALL_RELEASE: *\([^ ]*\).*|\1|p' "$root/$manifest" | sort -u)"
-  assert "$manifest pins nix-quick-install-action" [ -n "$pin" ]
+  assert "$manifest pins nix-quick-install-action to a commit" [ -n "$pin" ]
   check "$manifest pre-fetches the release it pins" "$env_release" "$pin"
 
   # An action reaches the script through its own directory, so a sub-action has
