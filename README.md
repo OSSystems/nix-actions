@@ -124,6 +124,7 @@ and update-flake callers.
 | `gc-max-store-size-linux` | `""` | On Linux, garbage-collect the store down to this size (e.g. `5G`) before saving the cache. Empty saves the store as it is. |
 | `checkout` | `"true"` | `"true"` to checkout first. Set `"false"` if the job already checked out. |
 | `fetch-depth` | `"1"` | Checkout fetch-depth. |
+| `persist-credentials` | `"true"` | `"true"` leaves the token in `.git/config` after checkout, so later steps can push. `"false"` removes it, so builds, `run` and later steps cannot read it. |
 | `ref` | `""` | Git ref to checkout (when `checkout` is true). Empty uses the ref that triggered the run. |
 | `flake-check` | `"true"` | `"true"` to run `nix flake check`. |
 | `flake-check-args` | `""` | Extra args for `nix flake check`. |
